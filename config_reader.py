@@ -1,9 +1,14 @@
 import copy
 import multiprocessing as mp
+from common_utils import get_logger
+import logging
 
+logger = get_logger(name=__name__, log_file=None, log_level=logging.DEBUG, log_level_name='')
 
 def process_configs(target, arg_parser):
+    logger.info(f'arg_parser\n{arg_parser}')
     args, _ = arg_parser.parse_known_args()
+    logger.info(f'args\n{args}')
     ctx = mp.get_context('spawn')
 
     for run_args, _run_config, _run_repeat in _yield_configs(arg_parser, args):
