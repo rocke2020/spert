@@ -23,7 +23,7 @@ class BaseInputReader(ABC):
 
         # entities
         # add 'None' entity type
-        none_entity_type = EntityType('None', 0, 'None', 'No Entity')
+        none_entity_type = EntityType(identifier='None', index=0, short_name='None', verbose_name='No Entity')
         self._entity_types['None'] = none_entity_type
         self._idx2entity_type[0] = none_entity_type
 

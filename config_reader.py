@@ -1,9 +1,14 @@
 import copy
 import multiprocessing as mp
+from common_utils import get_logger
+import logging
 
+logger = get_logger(name=__name__, log_file=None, log_level=logging.DEBUG, log_level_name='')
 
 def process_configs(target, arg_parser):
+    logger.info(f'arg_parser\n{arg_parser}')
     args, _ = arg_parser.parse_known_args()
+    logger.info(f'args\n{args}')
     ctx = mp.get_context('spawn')
 
     for run_args, _run_config, _run_repeat in _yield_configs(arg_parser, args):
@@ -24,6 +29,7 @@ def _read_config(path):
         if stripped_line.startswith('#'):
             continue
 
+        # It is strippled_line is empty. Pythantic way to short typing.
         if not stripped_line:
             if run[1]:
                 runs.append(run)
@@ -69,7 +75,9 @@ def _yield_configs(arg_parser, args, verbose=True):
 
             args_copy = copy.deepcopy(args)
             config_list = _convert_config(run_config)
+            logger.info(f'config_list\n{config_list}')
             run_args = arg_parser.parse_args(config_list, namespace=args_copy)
+            logger.info(f'run_args\n{run_args}')
             run_args_dict = vars(run_args)
 
             # set boolean values
