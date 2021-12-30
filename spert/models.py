@@ -15,11 +15,20 @@ logger = get_logger(name=__name__, log_file=None, log_level=logging.DEBUG, log_l
 def get_token(h: torch.tensor, x: torch.tensor, token: int):
     """ Get specific token embedding (e.g. [CLS]) """
     emb_size = h.shape[-1]
-
+    # token_h.shape: batch-size*seq-length, emb-size
     token_h = h.view(-1, emb_size)
-    flat = x.contiguous().view(-1)
+    # flat.shape: batch-size*seq-length
+    # the view() function cannot be applied to a discontiguous tensor. This is probably because view() requires that 
+    # the tensor to be contiguously stored so that it can do fast reshape in memory.
+    # To solve this, simply add contiguous() to a discontiguous tensor, to create contiguous copy and then apply view()
+    # I think it may be a old writing way, as x is from torch.stack, already contiguous, not need to call
+    # flat = x.contiguous().view(-1)
+    flat = x.view(-1)
 
     # get contextualized embedding of given token
+    # tmp = (flat == token)  # shape: the same as flat, batch-size*seq-length
+    # logger.debug(f'tmp {tmp.shape}')
+    # tmp = token_h[tmp, :]  # shape: keeps only the true value in tmp, the return shape is: batch-size, emd-size
     token_h = token_h[flat == token, :]
 
     return token_h
@@ -27,28 +36,34 @@ def get_token(h: torch.tensor, x: torch.tensor, token: int):
 
 class SpERT(BertPreTrainedModel):
     """ Span-based model to jointly extract entities and relations 
-    1. assume max entity size, that's the max word number within the entity is l< 100. I think it had better read max length from entity size, sometimes may larger than 100 words. Especially in biomedical.
+    1. assume max entity size, that's the max word number within the entity is l< 100. I think it had better read 
+    max length from entity size, sometimes may larger than 100 words. Especially in biomedical.
+    2. entity_types_count and relation_types_count are from input_reader which read trian and eva corpus and then the 
+    values may be different. So, I should assign max_pairs and mmax_entity_count which are based on whole analysis on
+    the whole dataset.
     """
 
     VERSION = '1.1'
 
-    def __init__(self, config: BertConfig, cls_token: int, relation_types: int, entity_types: int,
-                 size_embedding: int, prop_drop: float, freeze_transformer: bool, max_pairs: int = 100,
-                 max_entities_num: int = 100):
+    def __init__(self, config: BertConfig, cls_token: int, 
+                relation_types_count: int, entity_types_count: int,
+                size_embedding: int, prop_drop: float, freeze_transformer: bool, 
+                max_pairs: int = 100, max_entity_count = 100,
+                ):
         super(SpERT, self).__init__(config)
 
         # BERT model
         self.bert = BertModel(config)
 
         # layers
-        self.rel_classifier = nn.Linear(config.hidden_size * 3 + size_embedding * 2, relation_types)
-        self.entity_classifier = nn.Linear(config.hidden_size * 2 + size_embedding, entity_types)
-        self.size_embeddings = nn.Embedding(max_entities_num, size_embedding)
+        self.rel_classifier = nn.Linear(config.hidden_size * 3 + size_embedding * 2, relation_types_count)
+        self.entity_classifier = nn.Linear(config.hidden_size * 2 + size_embedding, entity_types_count)
+        self.size_embeddings = nn.Embedding(max_entity_count, size_embedding)
         self.dropout = nn.Dropout(prop_drop)
 
         self._cls_token = cls_token
-        self._relation_types = relation_types
-        self._entity_types = entity_types
+        self._relation_types_count = relation_types_count
+        self._entity_types_count = entity_types_count
         self._max_pairs = max_pairs
 
         # weight initialization
@@ -75,7 +90,7 @@ class SpERT(BertPreTrainedModel):
 
         # classify relations
         h_large = h.unsqueeze(1).repeat(1, max(min(relations.shape[1], self._max_pairs), 1), 1, 1)
-        rel_clf = torch.zeros([batch_size, relations.shape[1], self._relation_types]).to(
+        rel_clf = torch.zeros([batch_size, relations.shape[1], self._relation_types_count]).to(
             self.rel_classifier.weight.device)
 
         # obtain relation logits
@@ -107,7 +122,7 @@ class SpERT(BertPreTrainedModel):
 
         rel_sample_masks = rel_sample_masks.float().unsqueeze(-1)
         h_large = h.unsqueeze(1).repeat(1, max(min(relations.shape[1], self._max_pairs), 1), 1, 1)
-        rel_clf = torch.zeros([batch_size, relations.shape[1], self._relation_types]).to(
+        rel_clf = torch.zeros([batch_size, relations.shape[1], self._relation_types_count]).to(
             self.rel_classifier.weight.device)
 
         # obtain relation logits
@@ -129,17 +144,17 @@ class SpERT(BertPreTrainedModel):
 
     def _classify_entities(self, encodings, h, entity_masks, size_embeddings):
         # max pool entity candidate spans
-        # entity_masks.shape: batch-size, entities_num, seq-length
+        # entity_masks.shape: batch-size, entities-num, seq-length
         # m.shape: batch-size, seq-length, 1
         m = (entity_masks.unsqueeze(-1) == 0).float() * (-1e30)
-        logger.debug(f'entity_masks.shape {entity_masks.shape}')
-        logger.debug(f'm.shape {m.shape}')
-        logger.debug(f'h.shape {h.shape}')
         # h.shape: batch-size, seq-length, bert-dim-size
+        # entity_spans_pool.shape: batch-size, entities-num, seq-length, bert-dim-size
         entity_spans_pool = m + h.unsqueeze(1).repeat(1, entity_masks.shape[1], 1, 1)
+        # entity_spans_pool.shape: batch-size, entities-num, bert-dim-size
         entity_spans_pool = entity_spans_pool.max(dim=2)[0]
 
         # get cls token as candidate context representation
+        # shape: batch-size, emb-size
         entity_ctx = get_token(h, encodings, self._cls_token)
 
         # create candidate representations including context, max pooled span and size embedding
@@ -148,6 +163,7 @@ class SpERT(BertPreTrainedModel):
         entity_repr = self.dropout(entity_repr)
 
         # classify entity candidates
+        # shape: batch-size, entities-num, bert-dim-size
         entity_clf = self.entity_classifier(entity_repr)
 
         return entity_clf, entity_spans_pool

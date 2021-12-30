@@ -158,8 +158,8 @@ class SpERTTrainer(BaseTrainer):
                                             config=config,
                                             # SpERT model parameters
                                             cls_token=self._tokenizer.convert_tokens_to_ids('[CLS]'),
-                                            relation_types=input_reader.relation_type_count - 1,
-                                            entity_types=input_reader.entity_type_count,
+                                            relation_type_count=input_reader.relation_type_count - 1,
+                                            entity_type_count=input_reader.entity_type_count,
                                             max_pairs=self._args.max_pairs,
                                             prop_drop=self._args.prop_drop,
                                             size_embedding=self._args.size_embedding,
