@@ -155,7 +155,7 @@ class JsonInputReader(BaseInputReader):
             start, end = jentity['start'], jentity['end']
 
             # create entity mention
-            tokens = doc_tokens[start:end]
+            tokens = doc_tokens[start: end]
             phrase = " ".join([t.phrase for t in tokens])
             entity = dataset.create_entity(entity_type, tokens, phrase)
             entities.append(entity)
@@ -240,8 +240,8 @@ def _parse_tokens(jtokens, dataset, tokenizer):
         token = dataset.create_token(i, span_start, span_end, token_phrase)
 
         doc_tokens.append(token)
-        doc_encoding += token_encoding
+        doc_encoding.extend(token_encoding)
 
-    doc_encoding += [tokenizer.convert_tokens_to_ids('[SEP]')]
+    doc_encoding.append(tokenizer.convert_tokens_to_ids('[SEP]'))
 
     return doc_tokens, doc_encoding

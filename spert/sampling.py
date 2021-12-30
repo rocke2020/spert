@@ -1,11 +1,15 @@
 import random
 
 import torch
-
+from .entities import Document
 from spert import util
 
 
-def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span_size: int, rel_type_count: int):
+def create_train_sample(doc:Document, neg_entity_count: int, neg_rel_count: int, 
+    max_span_size: int, rel_type_count: int):
+    """  
+    rel_type_count: len(self._rel_types)
+    """
     encodings = doc.encoding
     token_count = len(doc.tokens)
     context_size = len(encodings)
@@ -13,13 +17,13 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
     # positive entities
     pos_entity_spans, pos_entity_types, pos_entity_masks, pos_entity_sizes = [], [], [], []
     for e in doc.entities:
+        # e.span is a tuple of span_start, span_end
         pos_entity_spans.append(e.span)
         pos_entity_types.append(e.entity_type.index)
         pos_entity_masks.append(create_entity_mask(*e.span, context_size))
         pos_entity_sizes.append(len(e.tokens))
 
     # positive relations
-
     # collect relations between entity pairs
     entity_pair_relations = dict()
     for rel in doc.relations:
@@ -37,6 +41,7 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
         pos_rel_spans.append((s1, s2))
 
         pair_rel_types = [r.relation_type.index for r in rels]
+        # change pair_rel_types to [0, 1, 0, 0, 0] format, mostly only one 1, that's one hot vector
         pair_rel_types = [int(t in pair_rel_types) for t in range(1, rel_type_count)]
         pos_rel_types.append(pair_rel_types)
         pos_rel_masks.append(create_rel_mask(s1, s2, context_size))
@@ -44,7 +49,10 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, max_span
     # negative entities
     neg_entity_spans, neg_entity_sizes = [], []
     for size in range(1, max_span_size + 1):
-        for i in range(0, (token_count - size) + 1):
+        ### a big bug on negtive sampling! 
+        # for i in range(0, (token_count - size) + 1):
+        for i in range(token_count):
+            if i + size > token_count: continue
             span = doc.tokens[i:i + size].span
             if span not in pos_entity_spans:
                 neg_entity_spans.append(span)
@@ -141,7 +149,8 @@ def create_eval_sample(doc, max_span_size: int):
     entity_sizes = []
 
     for size in range(1, max_span_size + 1):
-        for i in range(0, (token_count - size) + 1):
+        for i in range(token_count):
+            if i + size > token_count: continue
             span = doc.tokens[i:i + size].span
             entity_spans.append(span)
             entity_masks.append(create_entity_mask(*span, context_size))
@@ -185,6 +194,9 @@ def create_entity_mask(start, end, context_size):
 
 
 def create_rel_mask(s1, s2, context_size):
+    """  
+    mask the between area of 2 spans
+    """
     start = s1[1] if s1[1] < s2[0] else s2[1]
     end = s2[0] if s1[1] < s2[0] else s1[0]
     mask = create_entity_mask(start, end, context_size)
