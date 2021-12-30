@@ -1,11 +1,10 @@
 import random
 
 import torch
-from .entities import Document
 from spert import util
 
 
-def create_train_sample(doc:Document, neg_entity_count: int, neg_rel_count: int, 
+def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int, 
     max_span_size: int, rel_type_count: int):
     """  
     rel_type_count: len(self._rel_types)
@@ -212,6 +211,7 @@ def collate_fn_padding(batch):
 
         if not batch[0][key].shape:
             padded_batch[key] = torch.stack(samples)
+        # almost always go to else
         else:
             padded_batch[key] = util.padded_stack([s[key] for s in batch])
 

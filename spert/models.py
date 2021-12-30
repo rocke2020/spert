@@ -6,6 +6,10 @@ from transformers import BertPreTrainedModel
 
 from spert import sampling
 from spert import util
+from common_utils import get_logger
+import logging
+
+logger = get_logger(name=__name__, log_file=None, log_level=logging.DEBUG, log_level_name='')
 
 
 def get_token(h: torch.tensor, x: torch.tensor, token: int):
@@ -22,12 +26,15 @@ def get_token(h: torch.tensor, x: torch.tensor, token: int):
 
 
 class SpERT(BertPreTrainedModel):
-    """ Span-based model to jointly extract entities and relations """
+    """ Span-based model to jointly extract entities and relations 
+    1. assume max entity size, that's the max word number within the entity is l< 100. I think it had better read max length from entity size, sometimes may larger than 100 words. Especially in biomedical.
+    """
 
     VERSION = '1.1'
 
     def __init__(self, config: BertConfig, cls_token: int, relation_types: int, entity_types: int,
-                 size_embedding: int, prop_drop: float, freeze_transformer: bool, max_pairs: int = 100):
+                 size_embedding: int, prop_drop: float, freeze_transformer: bool, max_pairs: int = 100,
+                 max_entities_num: int = 100):
         super(SpERT, self).__init__(config)
 
         # BERT model
@@ -36,7 +43,7 @@ class SpERT(BertPreTrainedModel):
         # layers
         self.rel_classifier = nn.Linear(config.hidden_size * 3 + size_embedding * 2, relation_types)
         self.entity_classifier = nn.Linear(config.hidden_size * 2 + size_embedding, entity_types)
-        self.size_embeddings = nn.Embedding(100, size_embedding)
+        self.size_embeddings = nn.Embedding(max_entities_num, size_embedding)
         self.dropout = nn.Dropout(prop_drop)
 
         self._cls_token = cls_token
@@ -122,7 +129,13 @@ class SpERT(BertPreTrainedModel):
 
     def _classify_entities(self, encodings, h, entity_masks, size_embeddings):
         # max pool entity candidate spans
+        # entity_masks.shape: batch-size, entities_num, seq-length
+        # m.shape: batch-size, seq-length, 1
         m = (entity_masks.unsqueeze(-1) == 0).float() * (-1e30)
+        logger.debug(f'entity_masks.shape {entity_masks.shape}')
+        logger.debug(f'm.shape {m.shape}')
+        logger.debug(f'h.shape {h.shape}')
+        # h.shape: batch-size, seq-length, bert-dim-size
         entity_spans_pool = m + h.unsqueeze(1).repeat(1, entity_masks.shape[1], 1, 1)
         entity_spans_pool = entity_spans_pool.max(dim=2)[0]
 
