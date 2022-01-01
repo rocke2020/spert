@@ -113,7 +113,8 @@ def create_train_sample(doc, neg_entity_count: int, neg_rel_count: int,
         entity_sizes = torch.tensor(entity_sizes, dtype=torch.long)
         entity_sample_masks = torch.ones([entity_masks.shape[0]], dtype=torch.bool)
     else:
-        # corner case handling (no pos/neg entities)
+        # corner case handling (no pos/neg entities), 
+        # I don't find it is is impossible to encounter this corner case
         entity_types = torch.zeros([1], dtype=torch.long)
         entity_masks = torch.zeros([1, context_size], dtype=torch.bool)
         entity_sizes = torch.zeros([1], dtype=torch.long)

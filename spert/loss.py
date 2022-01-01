@@ -26,6 +26,7 @@ class SpERTLoss(Loss):
         entity_types = entity_types.view(-1)
         entity_sample_masks = entity_sample_masks.view(-1).float()
 
+        # entity_loss is reduction = 'none', return an array of values.
         entity_loss = self._entity_criterion(entity_logits, entity_types)
         # logger.debug(f'entity_loss {entity_loss}')
         entity_loss = (entity_loss * entity_sample_masks).sum() / entity_sample_masks.sum()
