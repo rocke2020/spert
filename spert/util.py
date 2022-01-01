@@ -153,6 +153,8 @@ def extend_tensor(tensor, extended_shape, fill=0):
 
 
 def padded_stack(tensors, padding=0):
+    """ nice to use dim_count, len(tensors[0].shape)s
+    """
     dim_count = len(tensors[0].shape)
 
     max_shape = [max([t.shape[d] for t in tensors]) for d in range(dim_count)]
@@ -167,6 +169,11 @@ def padded_stack(tensors, padding=0):
 
 
 def batch_index(tensor, index, pad=False):
+    """
+    entity_spans shape: batch-size, entities-num, bert-dim-size
+    index, that's relations, shape: batch-size, relation-num, 2
+    return shape: batch-size, relation-num, 2, bert-dim-size
+    """
     if tensor.shape[0] != index.shape[0]:
         raise Exception()
 

@@ -80,6 +80,7 @@ class SpERTTrainer(BaseTrainer):
                                                                  num_training_steps=updates_total)
         # create loss function
         rel_criterion = torch.nn.BCEWithLogitsLoss(reduction='none')
+        # if reduction = 'none', returns a array of values
         entity_criterion = torch.nn.CrossEntropyLoss(reduction='none')
         compute_loss = SpERTLoss(rel_criterion, entity_criterion, model, optimizer, scheduler, args.max_grad_norm)
 

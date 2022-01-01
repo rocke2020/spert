@@ -186,7 +186,7 @@ def create_eval_sample(doc, max_span_size: int):
                 entity_sizes=entity_sizes, entity_spans=entity_spans, entity_sample_masks=entity_sample_masks)
 
 
-def create_entity_mask(start, end, context_size):
+def create_entity_mask(start, end, context_size:int):
     mask = torch.zeros(context_size, dtype=torch.bool)
     mask[start:end] = 1
     return mask

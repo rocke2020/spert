@@ -1,7 +1,10 @@
 from abc import ABC
 
 import torch
+from common_utils import get_logger
+import logging
 
+logger = get_logger(name=__name__, log_file=None, log_level=logging.DEBUG, log_level_name='')
 
 class Loss(ABC):
     def compute(self, *args, **kwargs):
@@ -24,7 +27,9 @@ class SpERTLoss(Loss):
         entity_sample_masks = entity_sample_masks.view(-1).float()
 
         entity_loss = self._entity_criterion(entity_logits, entity_types)
+        # logger.debug(f'entity_loss {entity_loss}')
         entity_loss = (entity_loss * entity_sample_masks).sum() / entity_sample_masks.sum()
+        # logger.debug(f'after entity_loss {entity_loss}')
 
         # relation loss
         rel_sample_masks = rel_sample_masks.view(-1).float()
